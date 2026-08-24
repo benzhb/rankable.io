@@ -1,0 +1,187 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SessionPhase {
+  LOBBY
+  COUNTDOWN
+  PLAYING
+  RESULTS
+  ENDED
+}
+
+enum RoundStatus {
+  COUNTDOWN
+  PLAYING
+  RESULTS
+  COMPLETE
+  CANCELED
+}
+
+enum Tier {
+  S
+  A
+  B
+  C
+  D
+  F
+}
+
+enum TurnEndReason {
+  MANUAL
+  TIMEOUT
+  DISCONNECTED
+}
+
+model DiscordUser {
+  id             String          @id
+  username       String
+  globalName     String?
+  avatarHash     String?
+  avatarUrl      String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  participants   Participant[]
+  accessSessions AccessSession[]
+}
+
+model ActivitySession {
+  id                  String                @id @default(uuid())
+  discordInstanceId   String                @unique
+  phase               SessionPhase          @default(LOBBY)
+  leaderParticipantId String?
+  selectedCategoryKey String?
+  activeRoundId       String?
+  countdownEndsAt     DateTime?
+  resultsEndsAt       DateTime?
+  version             Int                   @default(0)
+  nextJoinOrder       Int                   @default(1)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  endedAt             DateTime?
+  participants        Participant[]
+  accessSessions      AccessSession[]
+  rounds              Round[]
+  mediaCatalog        MediaCatalogSnapshot?
+}
+
+model Participant {
+  id           String             @id @default(uuid())
+  sessionId    String
+  userId       String
+  joinOrder    Int
+  active       Boolean            @default(true)
+  joinedAt     DateTime           @default(now())
+  leftAt       DateTime?
+  lastSeenAt   DateTime           @default(now())
+  session      ActivitySession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user         DiscordUser        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roundPlayers RoundParticipant[]
+  turns        Turn[]
+  placements   Placement[]
+
+  @@unique([sessionId, userId])
+  @@index([sessionId, active, joinOrder])
+}
+
+model AccessSession {
+  id        String          @id @default(uuid())
+  tokenHash String          @unique
+  sessionId String
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime        @default(now())
+  session   ActivitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      DiscordUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, userId])
+  @@index([expiresAt])
+}
+
+model MediaCatalogSnapshot {
+  id        String          @id @default(uuid())
+  sessionId String          @unique
+  data      Json
+  loadedAt  DateTime        @default(now())
+  session   ActivitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Round {
+  id               String             @id @default(uuid())
+  sessionId        String
+  categoryKey      String
+  status           RoundStatus        @default(COUNTDOWN)
+  playerQueue      Json
+  cardQueue        Json
+  currentEndpoint  String             @default("BANK")
+  endpointSequence Int                @default(0)
+  turnNumber       Int                @default(0)
+  turnEndsAt       DateTime?
+  resultsEndsAt    DateTime?
+  createdAt        DateTime           @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  session          ActivitySession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  players          RoundParticipant[]
+  turns            Turn[]
+  placements       Placement[]
+
+  @@index([sessionId, status])
+}
+
+model RoundParticipant {
+  id                   String      @id @default(uuid())
+  roundId              String
+  participantId        String
+  initialQueuePosition Int
+  active               Boolean     @default(true)
+  removedAt            DateTime?
+  round                Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  participant          Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, participantId])
+  @@index([roundId, active, initialQueuePosition])
+}
+
+model Turn {
+  id            String        @id @default(uuid())
+  roundId       String
+  participantId String
+  turnNumber    Int
+  cardId        String?
+  finalTier     Tier?
+  startedAt     DateTime
+  endedAt       DateTime
+  endedReason   TurnEndReason
+  round         Round         @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  participant   Participant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, turnNumber])
+}
+
+model Placement {
+  id            String      @id @default(uuid())
+  roundId       String
+  participantId String
+  cardId        String
+  title         String
+  imageUrl      String
+  storagePath   String
+  tier          Tier
+  sortIndex     Int
+  createdAt     DateTime    @default(now())
+  round         Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, cardId])
+  @@index([roundId, tier, sortIndex])
+}

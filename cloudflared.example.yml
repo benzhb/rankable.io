@@ -1,0 +1,7 @@
+tunnel: rankable-development
+credentials-file: /absolute/path/to/cloudflare-credentials.json
+
+ingress:
+  - hostname: rankable-dev.example.com
+    service: http://localhost:3000
+  - service: http_status:404

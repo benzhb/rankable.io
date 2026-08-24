@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rankable
+      POSTGRES_USER: rankable
+      POSTGRES_PASSWORD: rankable_dev
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rankable -d rankable"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - rankable_postgres:/var/lib/postgresql/data
+
+volumes:
+  rankable_postgres:

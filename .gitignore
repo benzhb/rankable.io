@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+cloudflared.yml
+coverage/
+src/generated/
+*.log
+.DS_Store

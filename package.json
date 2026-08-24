@@ -1,0 +1,63 @@
+{
+  "name": "rankable-io",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "npm run prisma:generate && vite build && tsc -p tsconfig.server.json",
+    "check": "npm run typecheck && npm test && npm run build",
+    "db:deploy": "prisma migrate deploy",
+    "db:dev": "prisma migrate dev",
+    "dev": "npm run db:up && npm run db:deploy && concurrently --kill-others-on-fail --names app,tunnel --prefix-colors cyan,magenta \"npm:dev:app\" \"npm:dev:tunnel\"",
+    "dev:app": "tsx watch src/server/server.ts",
+    "dev:local": "npm run db:up && npm run db:deploy && npm run dev:app",
+    "dev:tunnel": "cloudflared tunnel --config cloudflared.yml run",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down",
+    "prisma:generate": "prisma generate",
+    "start": "node dist/server/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@discord/embedded-app-sdk": "^2.4.0",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@supabase/supabase-js": "^2.112.3",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pg": "^8.23.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.9.1",
+    "ws": "^8.18.3",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^7.2.0",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^5.1.4",
+    "concurrently": "^9.2.1",
+    "jsdom": "^27.2.0",
+    "prisma": "^7.9.1",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  }
+}
