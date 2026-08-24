@@ -36,7 +36,10 @@ describe("round turns", () => {
         count: vi.fn(async () => 0),
         create: placementCreate,
       },
-      turn: { create: turnCreate },
+      turn: {
+        findMany: vi.fn(async () => []),
+        create: turnCreate,
+      },
       activitySession: { update: vi.fn(async () => undefined) },
     };
     const database = {
@@ -68,5 +71,99 @@ describe("round turns", () => {
         currentEndpoint: "BANK",
       }),
     });
+  });
+
+  it("trashes the card after every active player has passed it", async () => {
+    const skippedCard = {
+      id: "card-1",
+      title: "Nobody Knows This",
+      imageUrl: "/media/cards/card-1",
+      storagePath: "anime/nobody-knows-this.webp",
+    };
+    const nextCard = {
+      id: "card-2",
+      title: "Next Card",
+      imageUrl: "/media/cards/card-2",
+      storagePath: "anime/next-card.webp",
+    };
+    const roundUpdate = vi.fn(async () => undefined);
+    const transaction = {
+      round: {
+        findUnique: vi.fn(async () => ({
+          id: "round-1",
+          sessionId: "session-1",
+          status: "PLAYING",
+          turnEndsAt: new Date(Date.now() + 10_000),
+          playerQueue: ["participant-1", "participant-2"],
+          cardQueue: [skippedCard, nextCard],
+          currentEndpoint: "BANK",
+          turnNumber: 4,
+        })),
+        update: roundUpdate,
+      },
+      participant: {
+        findUnique: vi.fn(async () => ({ id: "participant-1", active: true })),
+      },
+      placement: {
+        count: vi.fn(async () => 0),
+        create: vi.fn(async () => undefined),
+      },
+      turn: {
+        findMany: vi.fn(async () => [{ participantId: "participant-2" }]),
+        create: vi.fn(async () => undefined),
+      },
+      activitySession: { update: vi.fn(async () => undefined) },
+    };
+    const database = {
+      $transaction: vi.fn(async (operation: (client: typeof transaction) => unknown) =>
+        operation(transaction)),
+    } as unknown as PrismaClient;
+    const service = new RoundService(
+      database,
+      { emit: vi.fn(async () => undefined) } as unknown as SessionEventBus,
+      { cancel: vi.fn(), schedule: vi.fn() } as unknown as TimerSchedulerService,
+    );
+
+    await service.endTurn({
+      accessSessionId: "access-1",
+      sessionId: "session-1",
+      userId: "user-1",
+    }, "round-1");
+
+    expect(roundUpdate).toHaveBeenCalledWith({
+      where: { id: "round-1" },
+      data: expect.objectContaining({
+        cardQueue: [nextCard],
+        lastSkippedCardTitle: "Nobody Knows This",
+        lastSkippedAt: expect.any(Date),
+      }),
+    });
+  });
+
+  it("allows active round players to emote", async () => {
+    const database = {
+      round: {
+        findUnique: vi.fn(async () => ({
+          id: "round-1",
+          sessionId: "session-1",
+          status: "PLAYING",
+          playerQueue: ["participant-1", "participant-2"],
+        })),
+      },
+      participant: {
+        findUnique: vi.fn(async () => ({ id: "participant-2", active: true })),
+      },
+    } as unknown as PrismaClient;
+    const service = new RoundService(
+      database,
+      {} as SessionEventBus,
+      {} as TimerSchedulerService,
+    );
+
+    await expect(service.participantForEmote({
+      accessSessionId: "access-1",
+      sessionId: "session-1",
+      userId: "user-2",
+    }, "round-1")).resolves.toBe("participant-2");
   });
 });

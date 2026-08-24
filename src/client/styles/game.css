@@ -59,6 +59,7 @@
   align-items: stretch;
   gap: clamp(0.45rem, 1vw, 0.85rem);
 }
+.tier-list-shell { position: relative; height: 100%; min-height: 0; }
 .tier-list {
   display: grid;
   height: 100%;
@@ -138,6 +139,14 @@
 }
 @keyframes card-arrive { from { opacity: 0.45; transform: translateY(8px); } }
 .media-card--placeholder { display: grid; place-items: center; color: var(--muted); border-style: dashed; font-size: 0.7rem; font-weight: 800; }
+.emote-menu { position: absolute; z-index: 4; top: 0.4rem; right: 0.45rem; display: flex; align-items: center; gap: 0.3rem; }
+.emote-menu__panel { display: flex; gap: 0.25rem; padding: 0.2rem; border: 1px solid var(--line-strong); border-radius: 999px; background: #171717; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); animation: emote-menu-in 120ms ease-out; }
+.emote-menu button { display: grid; width: 2rem; height: 2rem; padding: 0; place-items: center; border: 1px solid #454545; border-radius: 50%; color: #f7f6f2; background: #101010; font-size: 1.05rem; line-height: 1; }
+.emote-menu button:not(:disabled):hover { border-color: #f7f6f2; background: #282828; transform: translateY(-1px); }
+.emote-menu__toggle { font-family: ui-rounded, system-ui, sans-serif; }
+@keyframes emote-menu-in { from { opacity: 0; transform: translateX(0.35rem) scale(0.94); } }
+.skip-notice { position: absolute; z-index: 6; top: clamp(3.8rem, 9vh, 5rem); left: 50%; max-width: min(80%, 30rem); overflow: hidden; padding: 0.55rem 0.8rem; border: 1px solid #f7f6f2; border-radius: 999px; color: #f7f6f2; background: rgba(13, 13, 13, 0.94); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; transform: translateX(-50%); animation: skip-notice-in 180ms ease-out; }
+@keyframes skip-notice-in { from { opacity: 0; transform: translate(-50%, -0.5rem) scale(0.96); } }
 .game-sidebar { display: flex; min-height: 0; flex-direction: column; gap: clamp(0.4rem, 1vh, 0.7rem); }
 .player-queue {
   display: flex;
@@ -165,7 +174,10 @@
   color: #c9c9c9;
 }
 .queued-player:last-child { border-bottom: 0; }
-.queued-player > span:nth-child(3) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 750; }
+.queued-player__name { position: relative; overflow: visible; text-overflow: ellipsis; white-space: nowrap; font-weight: 750; }
+.player-emote-bubble { position: absolute; z-index: 3; top: 50%; right: 0; display: grid; min-width: 2rem; height: 1.75rem; padding: 0 0.35rem; place-items: center; border: 1px solid #d7d6d2; border-radius: 0.8rem 0.8rem 0.8rem 0.2rem; color: #080808; background: #f7f6f2; box-shadow: 0 5px 14px rgba(0, 0, 0, 0.35); font-size: 1rem; transform: translate(35%, -115%); animation: player-emote-pop 180ms cubic-bezier(0.2, 0.9, 0.3, 1.25); }
+.player-emote-bubble::after { position: absolute; right: 70%; bottom: -0.28rem; width: 0.5rem; height: 0.5rem; border-right: 1px solid #d7d6d2; border-bottom: 1px solid #d7d6d2; background: #f7f6f2; content: ""; transform: rotate(45deg); }
+@keyframes player-emote-pop { from { opacity: 0; transform: translate(35%, -90%) scale(0.55); } }
 .queued-player--current { color: #080808; background: #f7f6f2; }
 .queued-player--current .avatar { border-color: #080808; }
 .queue-position { color: #777777; font-size: 0.72rem; font-weight: 900; text-align: center; }

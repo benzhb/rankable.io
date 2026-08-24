@@ -92,6 +92,13 @@ export class SnapshotService {
           turnNumber: round.turnNumber,
           turnEndsAt: round.turnEndsAt?.toISOString() ?? null,
           resultsEndsAt: round.resultsEndsAt?.toISOString() ?? null,
+          lastSkippedCard:
+            round.lastSkippedCardTitle && round.lastSkippedAt
+              ? {
+                  title: round.lastSkippedCardTitle,
+                  skippedAt: round.lastSkippedAt.toISOString(),
+                }
+              : null,
           cardBank: {
             remainingCount: cardQueue.length,
             visibleCards: visibleCardWindow(cardQueue).map(clientCard),

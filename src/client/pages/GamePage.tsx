@@ -6,6 +6,8 @@ import { CardBank } from "../components/game/CardBank.js";
 import { PlayerQueue } from "../components/game/PlayerQueue.js";
 import { ResultsOverlay } from "../components/game/ResultsOverlay.js";
 import { TierList } from "../components/game/TierList.js";
+import { EmoteMenu } from "../components/game/EmoteMenu.js";
+import { SkipNotice } from "../components/game/SkipNotice.js";
 import { SoundControls } from "../components/shared/SoundControls.js";
 
 export function GamePage() {
@@ -40,17 +42,24 @@ export function GamePage() {
       </header>
 
       {activity.error && <div className="game-error"><ActivityError message={activity.error} /></div>}
+      <SkipNotice skippedCard={round.lastSkippedCard} />
 
       <div className="game-layout">
-        <TierList
-          placements={round.placements}
-          activeCard={activeCard}
-          endpoint={round.currentEndpoint}
-          canMove={isCurrent && round.status === "PLAYING"}
-          onMove={activity.moveCard}
-        />
+        <div className="tier-list-shell">
+          <TierList
+            placements={round.placements}
+            activeCard={activeCard}
+            endpoint={round.currentEndpoint}
+            canMove={isCurrent && round.status === "PLAYING"}
+            onMove={activity.moveCard}
+          />
+          <EmoteMenu
+            disabled={snapshot.self.membership !== "JOINED"}
+            onEmote={activity.sendEmote}
+          />
+        </div>
         <div className="game-sidebar">
-          <PlayerQueue players={round.playerQueue} />
+          <PlayerQueue players={round.playerQueue} emotes={activity.emotes} />
           {round.status === "PLAYING" && (
             <button
               className="button button--primary end-turn"

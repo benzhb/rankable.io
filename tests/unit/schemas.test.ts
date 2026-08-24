@@ -49,4 +49,17 @@ describe("public schemas", () => {
       sequence: 3,
     }).success).toBe(false);
   });
+
+  it("accepts only the supported round emotes", () => {
+    expect(websocketClientFrameSchema.safeParse({
+      type: "round.emote.send",
+      roundId: "round-1",
+      emote: "THUMBS_UP",
+    }).success).toBe(true);
+    expect(websocketClientFrameSchema.safeParse({
+      type: "round.emote.send",
+      roundId: "round-1",
+      emote: "PARTY_PARROT",
+    }).success).toBe(false);
+  });
 });

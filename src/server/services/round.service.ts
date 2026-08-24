@@ -142,6 +142,26 @@ export class RoundService {
     });
   }
 
+  async participantForEmote(context: AuthContext, roundId: string): Promise<string> {
+    const [round, participant] = await Promise.all([
+      this.database.round.findUnique({ where: { id: roundId } }),
+      this.database.participant.findUnique({
+        where: { sessionId_userId: { sessionId: context.sessionId, userId: context.userId } },
+      }),
+    ]);
+    if (
+      !round ||
+      round.sessionId !== context.sessionId ||
+      !["PLAYING", "RESULTS"].includes(round.status)
+    ) {
+      throw new AppError(409, "ROUND_NOT_ACTIVE", "Emotes are only available during a round");
+    }
+    if (!participant?.active || !ids(round.playerQueue).includes(participant.id)) {
+      throw new AppError(403, "PLAYER_REQUIRED", "Only active players can emote");
+    }
+    return participant.id;
+  }
+
   async handleTurnTimeout(roundId: string): Promise<void> {
     const round = await this.database.round.findUnique({ where: { id: roundId } });
     if (!round || round.status !== "PLAYING") return;
@@ -188,7 +208,29 @@ export class RoundService {
       const bank = cards(round.cardQueue);
       const activeCard = bank[0] ?? null;
       const shouldCommit = Boolean(activeCard && isTier(endpoint));
-      const nextBank = shouldCommit ? bank.slice(1) : bank;
+      let nextBank = shouldCommit ? bank.slice(1) : bank;
+      let skippedAt: Date | null = null;
+
+      if (activeCard && !shouldCommit) {
+        const previousPasses = await transaction.turn.findMany({
+          where: {
+            roundId: round.id,
+            cardId: activeCard.id,
+            finalTier: null,
+          },
+          select: { participantId: true },
+        });
+        const passedPlayers = new Set(previousPasses.map((turn) => turn.participantId));
+        passedPlayers.add(participantId);
+        if (queue.every((queuedParticipantId) => passedPlayers.has(queuedParticipantId))) {
+          nextBank = bank.slice(1);
+          skippedAt = new Date();
+        }
+      }
+
+      const skippedCardData = skippedAt && activeCard
+        ? { lastSkippedCardTitle: activeCard.title, lastSkippedAt: skippedAt }
+        : {};
 
       if (activeCard && shouldCommit && isTier(endpoint)) {
         const sortIndex = await transaction.placement.count({
@@ -234,6 +276,7 @@ export class RoundService {
             turnEndsAt: null,
             resultsEndsAt: resultsDeadline,
             turnNumber: { increment: 1 },
+            ...skippedCardData,
           },
         });
         await transaction.activitySession.update({
@@ -258,6 +301,7 @@ export class RoundService {
           endpointSequence: 0,
           turnNumber: { increment: 1 },
           turnEndsAt: turnDeadline,
+          ...skippedCardData,
         },
       });
       await transaction.activitySession.update({

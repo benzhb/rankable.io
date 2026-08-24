@@ -1,7 +1,18 @@
-import type { QueuedPlayerSnapshot } from "../../../shared/types/round.types.js";
+import type {
+  PlayerEmoteEvent,
+  QueuedPlayerSnapshot,
+} from "../../../shared/types/round.types.js";
 import { Avatar } from "../shared/Avatar.js";
 
-export function PlayerQueue({ players }: { players: QueuedPlayerSnapshot[] }) {
+const emoteSymbol = {
+  THUMBS_UP: "👍",
+  THUMBS_DOWN: "👎",
+} as const;
+
+export function PlayerQueue({ players, emotes = {} }: {
+  players: QueuedPlayerSnapshot[];
+  emotes?: Readonly<Record<string, PlayerEmoteEvent>>;
+}) {
   return (
     <aside className="player-queue" aria-labelledby="queue-heading">
       <span className="eyebrow">Turn order</span>
@@ -14,7 +25,18 @@ export function PlayerQueue({ players }: { players: QueuedPlayerSnapshot[] }) {
           >
             <span className="queue-position">{index + 1}</span>
             <Avatar src={player.avatarUrl} username={player.username} size="small" />
-            <span>{player.username}</span>
+            <span className="queued-player__name">
+              {player.username}
+              {emotes[player.participantId] && (
+                <span
+                  className="player-emote-bubble"
+                  aria-label={`${player.username} reacted ${emoteSymbol[emotes[player.participantId]!.emote]}`}
+                  key={emotes[player.participantId]!.sentAt}
+                >
+                  {emoteSymbol[emotes[player.participantId]!.emote]}
+                </span>
+              )}
+            </span>
             {player.isCurrent && <span className="turn-dot" aria-label="Current turn" />}
           </div>
         ))}

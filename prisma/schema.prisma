@@ -126,6 +126,8 @@ model Round {
   turnNumber       Int                @default(0)
   turnEndsAt       DateTime?
   resultsEndsAt    DateTime?
+  lastSkippedCardTitle String?
+  lastSkippedAt    DateTime?
   createdAt        DateTime           @default(now())
   startedAt        DateTime?
   completedAt      DateTime?

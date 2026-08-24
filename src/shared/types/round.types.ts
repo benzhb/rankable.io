@@ -3,6 +3,14 @@ import type { MediaCard } from "./media.types.js";
 export const TIERS = ["S", "A", "B", "C", "F"] as const;
 export type Tier = (typeof TIERS)[number];
 export type CardEndpoint = "BANK" | Tier;
+export type PlayerEmote = "THUMBS_UP" | "THUMBS_DOWN";
+
+export interface PlayerEmoteEvent {
+  roundId: string;
+  participantId: string;
+  emote: PlayerEmote;
+  sentAt: string;
+}
 
 export interface QueuedPlayerSnapshot {
   participantId: string;
@@ -29,6 +37,10 @@ export interface RoundSnapshot {
   turnNumber: number;
   turnEndsAt: string | null;
   resultsEndsAt: string | null;
+  lastSkippedCard: {
+    title: string;
+    skippedAt: string;
+  } | null;
   cardBank: {
     remainingCount: number;
     visibleCards: MediaCard[];

@@ -39,6 +39,7 @@ export function attachWebSocketServer(
 ): { close: () => Promise<void> } {
   const webSockets = new WebSocketServer({ noServer: true });
   const registry = new ConnectionRegistry();
+  const lastEmoteAt = new Map<string, number>();
   let shuttingDown = false;
 
   server.on("upgrade", (request, socket, head) => {
@@ -84,6 +85,27 @@ export function attachWebSocketServer(
         if (frame.type === "authenticate") return;
         if (frame.type === "turn.card.endpoint-changed") {
           await application.rounds.changeEndpoint(connection.context, frame);
+        } else if (frame.type === "round.emote.send") {
+          const cooldownKey = `${connection.context.sessionId}:${connection.context.userId}`;
+          const now = Date.now();
+          if (now - (lastEmoteAt.get(cooldownKey) ?? 0) < 600) {
+            throw new AppError(429, "EMOTE_COOLDOWN", "Wait a moment before emoting again");
+          }
+          const participantId = await application.rounds.participantForEmote(
+            connection.context,
+            frame.roundId,
+          );
+          lastEmoteAt.set(cooldownKey, now);
+          const emoteFrame = {
+            type: "round.emote",
+            roundId: frame.roundId,
+            participantId,
+            emote: frame.emote,
+            sentAt: new Date(now).toISOString(),
+          };
+          for (const recipient of registry.forSession(connection.context.sessionId)) {
+            send(recipient.socket, emoteFrame);
+          }
         }
       } catch (error) {
         sendError(socket, error);

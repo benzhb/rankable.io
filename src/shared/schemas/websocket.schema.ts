@@ -7,6 +7,11 @@ export const websocketClientFrameSchema = z.discriminatedUnion("type", [
     token: z.string().min(1),
   }),
   endpointChangeSchema,
+  z.object({
+    type: z.literal("round.emote.send"),
+    roundId: z.string().min(1),
+    emote: z.enum(["THUMBS_UP", "THUMBS_DOWN"]),
+  }),
 ]);
 
 export type WebSocketClientFrame = z.infer<typeof websocketClientFrameSchema>;
