@@ -13,7 +13,7 @@ describe("activity media catalog", () => {
     const database = {
       mediaCatalogSnapshot: { findUnique, create },
     } as unknown as PrismaClient;
-    const service = new MediaCatalogService(database);
+    const service = new MediaCatalogService(database, null);
 
     const first = await service.ensureForSession("session-1");
     const second = await service.ensureForSession("session-1");

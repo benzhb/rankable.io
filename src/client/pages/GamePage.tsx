@@ -6,6 +6,7 @@ import { CardBank } from "../components/game/CardBank.js";
 import { PlayerQueue } from "../components/game/PlayerQueue.js";
 import { ResultsOverlay } from "../components/game/ResultsOverlay.js";
 import { TierList } from "../components/game/TierList.js";
+import { SoundControls } from "../components/shared/SoundControls.js";
 
 export function GamePage() {
   const activity = useDiscordActivity();
@@ -26,16 +27,19 @@ export function GamePage() {
           <p className="game-wordmark">rankable.io</p>
           <div><span className="eyebrow">Category</span><h1>{category ?? round.categoryKey}</h1></div>
         </div>
-        {round.status === "PLAYING" && (
-          <div className={`turn-clock ${(remaining ?? 16) <= 5 ? "turn-clock--urgent" : ""}`}>
-            <span>{isCurrent ? "Your turn" : `${round.playerQueue[0]?.username ?? "Player"}'s turn`}</span>
-            <strong>{remaining ?? 0}</strong>
-          </div>
-        )}
+        <div className="game-header-actions">
+          <SoundControls />
+          {round.status === "PLAYING" && (
+            <div className={`turn-clock ${(remaining ?? 16) <= 5 ? "turn-clock--urgent" : ""}`}>
+              <span>{isCurrent ? "Your turn" : `${round.playerQueue[0]?.username ?? "Player"}'s turn`}</span>
+              <strong>{remaining ?? 0}</strong>
+            </div>
+          )}
+          {round.status === "RESULTS" && <ResultsOverlay deadline={round.resultsEndsAt} />}
+        </div>
       </header>
 
-      {activity.error && <ActivityError message={activity.error} />}
-      {round.status === "RESULTS" && <ResultsOverlay deadline={round.resultsEndsAt} />}
+      {activity.error && <div className="game-error"><ActivityError message={activity.error} /></div>}
 
       <div className="game-layout">
         <TierList
@@ -45,21 +49,23 @@ export function GamePage() {
           canMove={isCurrent && round.status === "PLAYING"}
           onMove={activity.moveCard}
         />
-        <PlayerQueue players={round.playerQueue} />
+        <div className="game-sidebar">
+          <PlayerQueue players={round.playerQueue} />
+          {round.status === "PLAYING" && (
+            <button
+              className="button button--primary end-turn"
+              disabled={!snapshot.capabilities.canEndTurn || ending}
+              title={round.currentEndpoint === "BANK" ? "Skip this card for your turn" : "Finish your turn"}
+              onClick={() => {
+                setEnding(true);
+                void activity.endTurn().finally(() => setEnding(false));
+              }}
+            >
+              End Turn
+            </button>
+          )}
+        </div>
       </div>
-
-      {round.status === "PLAYING" && (
-        <button
-          className="button button--primary end-turn"
-          disabled={!snapshot.capabilities.canEndTurn || ending}
-          onClick={() => {
-            setEnding(true);
-            void activity.endTurn().finally(() => setEnding(false));
-          }}
-        >
-          End Turn
-        </button>
-      )}
 
       <CardBank
         cards={round.cardBank.visibleCards}

@@ -35,6 +35,7 @@ describe("game rules", () => {
   it("recognizes only final tier endpoints", () => {
     expect(isTier("S")).toBe(true);
     expect(isTier("F")).toBe(true);
+    expect(isTier("D" as never)).toBe(false);
     expect(isTier("BANK")).toBe(false);
   });
 

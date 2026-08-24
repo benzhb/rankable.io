@@ -185,10 +185,6 @@ export class RoundService {
       }
 
       const endpoint = round.currentEndpoint as CardEndpoint;
-      if (input.reason === "MANUAL" && !isTier(endpoint)) {
-        throw new AppError(409, "CARD_NOT_PLACED", "Place the card in a tier before ending your turn");
-      }
-
       const bank = cards(round.cardQueue);
       const activeCard = bank[0] ?? null;
       const shouldCommit = Boolean(activeCard && isTier(endpoint));

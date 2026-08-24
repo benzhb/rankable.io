@@ -29,7 +29,7 @@ export function CardBank({
     >
       <div className="card-bank__title">
         <div><span className="eyebrow">Up next</span><h2>Card queue</h2></div>
-        <span>{remainingCount} remaining</span>
+        <span>{canMove && endpoint === "BANK" ? "End Turn to skip" : `${remainingCount} remaining`}</span>
       </div>
       <div className="card-bank__row">
         {cards.map((card, index) => {

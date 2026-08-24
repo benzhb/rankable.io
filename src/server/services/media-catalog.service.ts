@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MediaCatalog, MediaCard, MediaCategory } from "../../shared/types/media.types.js";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { env, isProduction } from "../config/env.js";
@@ -6,6 +7,18 @@ import { labelFromFolder, titleFromFilename } from "../models/game-rules.js";
 import { getSupabase } from "../infrastructure/supabase.js";
 
 const IMAGE_EXTENSION = /\.(avif|gif|jpe?g|png|webp)$/i;
+
+function contentTypeForPath(path: string): string {
+  const extension = path.split(".").at(-1)?.toLowerCase();
+  return ({
+    avif: "image/avif",
+    gif: "image/gif",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  } as Record<string, string>)[extension ?? ""] ?? "application/octet-stream";
+}
 
 function cardId(path: string): string {
   return createHash("sha256").update(path).digest("hex").slice(0, 24);
@@ -38,15 +51,32 @@ function developmentCatalog(): MediaCatalog {
 }
 
 export class MediaCatalogService {
-  constructor(private readonly database: PrismaClient) {}
+  private readonly storagePaths = new Map<string, string>();
+  private hydratedStoredCatalogs = false;
+
+  constructor(
+    private readonly database: PrismaClient,
+    private readonly supabase: SupabaseClient | null = getSupabase(),
+  ) {}
+
+  private remember(catalog: MediaCatalog): void {
+    for (const category of catalog.categories) {
+      for (const card of category.cards) this.storagePaths.set(card.id, card.storagePath);
+    }
+  }
 
   async ensureForSession(sessionId: string): Promise<MediaCatalog> {
     const existing = await this.database.mediaCatalogSnapshot.findUnique({
       where: { sessionId },
     });
-    if (existing) return existing.data as unknown as MediaCatalog;
+    if (existing) {
+      const catalog = existing.data as unknown as MediaCatalog;
+      this.remember(catalog);
+      return catalog;
+    }
 
     const catalog = await this.loadFromBucket();
+    this.remember(catalog);
     try {
       await this.database.mediaCatalogSnapshot.create({
         data: { sessionId, data: catalog as never },
@@ -56,13 +86,47 @@ export class MediaCatalogService {
       const raced = await this.database.mediaCatalogSnapshot.findUnique({
         where: { sessionId },
       });
-      if (raced) return raced.data as unknown as MediaCatalog;
+      if (raced) {
+        const racedCatalog = raced.data as unknown as MediaCatalog;
+        this.remember(racedCatalog);
+        return racedCatalog;
+      }
       throw error;
     }
   }
 
+  async cardImage(cardId: string): Promise<{ body: Buffer; contentType: string } | null> {
+    let storagePath = this.storagePaths.get(cardId);
+    if (!storagePath && !this.hydratedStoredCatalogs) {
+      const snapshots = await this.database.mediaCatalogSnapshot.findMany({
+        select: { data: true },
+      });
+      for (const snapshot of snapshots) {
+        this.remember(snapshot.data as unknown as MediaCatalog);
+      }
+      this.hydratedStoredCatalogs = true;
+      storagePath = this.storagePaths.get(cardId);
+    }
+    if (!storagePath) return null;
+
+    const supabase = this.supabase;
+    if (!supabase) return null;
+    const { data, error } = await supabase.storage
+      .from(env.supabaseStorageBucket)
+      .download(storagePath);
+    if (error) throw new Error(`Unable to load media card: ${error.message}`);
+
+    return {
+      body: Buffer.from(await data.arrayBuffer()),
+      contentType:
+        data.type && data.type !== "application/octet-stream"
+          ? data.type
+          : contentTypeForPath(storagePath),
+    };
+  }
+
   private async loadFromBucket(): Promise<MediaCatalog> {
-    const supabase = getSupabase();
+    const supabase = this.supabase;
     if (!supabase) {
       if (isProduction) throw new Error("Supabase media catalog is unavailable");
       return developmentCatalog();
@@ -92,21 +156,15 @@ export class MediaCatalogService {
         .map((file) => `${prefix}/${file.name}`);
       if (paths.length === 0) continue;
 
-      const { data: signed, error: signError } = await supabase.storage
-        .from(env.supabaseStorageBucket)
-        .createSignedUrls(paths, env.mediaSignedUrlTtlSeconds);
-      if (signError) throw new Error(`Unable to sign ${folder} media: ${signError.message}`);
-
-      const cards: MediaCard[] = paths.flatMap((path, index) => {
-        const signedUrl = signed?.[index]?.signedUrl;
-        if (!signedUrl) return [];
+      const cards: MediaCard[] = paths.map((path) => {
         const filename = path.split("/").at(-1) ?? path;
-        return [{
-          id: cardId(path),
+        const id = cardId(path);
+        return {
+          id,
           title: titleFromFilename(filename),
-          imageUrl: signedUrl,
+          imageUrl: `/media/cards/${encodeURIComponent(id)}`,
           storagePath: path,
-        }];
+        };
       });
 
       if (cards.length > 0) {

@@ -15,7 +15,7 @@ export function MediaCardView({ card, draggable = false, active = false }: {
       }}
       data-card-id={card.id}
     >
-      <img src={card.imageUrl} alt="" draggable={false} />
+      <img src={card.imageUrl} alt={card.title} draggable={false} />
       <span>{card.title}</span>
     </article>
   );

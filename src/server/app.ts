@@ -3,6 +3,7 @@ import type { Application } from "./application.js";
 import { errorHandler, notFound } from "./middleware/error-handler.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
 import { createHealthRouter } from "./routes/health.routes.js";
+import { createMediaRouter } from "./routes/media.routes.js";
 import { createRoundRouter } from "./routes/round.routes.js";
 import { createSessionRouter } from "./routes/session.routes.js";
 
@@ -12,6 +13,7 @@ export function createApp(application: Application, includeFallback = true): Exp
   app.use(express.json({ limit: "32kb" }));
 
   app.use("/health", createHealthRouter(application.controllers.health));
+  app.use("/media", createMediaRouter(application.controllers.media));
   app.use("/api/auth", createAuthRouter(application.controllers.auth));
   app.use(
     "/api/session",

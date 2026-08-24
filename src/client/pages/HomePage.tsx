@@ -4,6 +4,7 @@ import { ActivityError } from "../components/shared/ActivityError.js";
 import { CountdownTimer } from "../components/home/CountdownTimer.js";
 import { LeaderControls } from "../components/home/LeaderControls.js";
 import { LobbyList } from "../components/home/LobbyList.js";
+import { SoundControls } from "../components/shared/SoundControls.js";
 
 export function HomePage() {
   const activity = useDiscordActivity();
@@ -18,6 +19,7 @@ export function HomePage() {
           <h1>rankable.io</h1>
           <p>Build the tier list together.</p>
         </div>
+        <SoundControls />
       </header>
 
       <div className="home-content">

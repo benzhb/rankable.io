@@ -1,13 +1,12 @@
 import { z } from "zod";
 
-export const tierSchema = z.enum(["S", "A", "B", "C", "D", "F"]);
+export const tierSchema = z.enum(["S", "A", "B", "C", "F"]);
 export const cardEndpointSchema = z.enum([
   "BANK",
   "S",
   "A",
   "B",
   "C",
-  "D",
   "F",
 ]);
 

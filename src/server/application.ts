@@ -13,6 +13,7 @@ import { SnapshotService } from "./services/snapshot.service.js";
 import { TimerSchedulerService } from "./services/timer-scheduler.service.js";
 import { AuthController } from "./controllers/auth.controller.js";
 import { HealthController } from "./controllers/health.controller.js";
+import { MediaController } from "./controllers/media.controller.js";
 import { RoundController } from "./controllers/round.controller.js";
 import { SessionController } from "./controllers/session.controller.js";
 
@@ -47,6 +48,7 @@ export function createApplication(database: PrismaClient = prisma) {
     controllers: {
       auth: new AuthController(auth, discord, snapshots),
       health: new HealthController(database),
+      media: new MediaController(mediaCatalog),
       round: new RoundController(rounds, snapshots),
       session: new SessionController(sessions, snapshots),
     },

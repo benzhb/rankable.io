@@ -8,7 +8,6 @@ const tierClass: Record<Tier, string> = {
   A: "tier--a",
   B: "tier--b",
   C: "tier--c",
-  D: "tier--d",
   F: "tier--f",
 };
 

@@ -37,4 +37,16 @@ describe("public schemas", () => {
       y: 20,
     }).success).toBe(false);
   });
+
+  it("rejects the removed D tier endpoint", () => {
+    expect(endpointChangeSchema.safeParse({
+      type: "turn.card.endpoint-changed",
+      roundId: "round-1",
+      turnNumber: 2,
+      cardId: "card-1",
+      from: "BANK",
+      to: "D",
+      sequence: 3,
+    }).success).toBe(false);
+  });
 });

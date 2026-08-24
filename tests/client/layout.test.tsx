@@ -67,4 +67,20 @@ describe("lobby and game layouts", () => {
     fireEvent.drop(firstTier);
     expect(move).toHaveBeenCalledWith("S");
   });
+
+  it("renders the compact five-tier board without a D tier", () => {
+    const { container } = render(
+      <TierList
+        placements={[]}
+        activeCard={card("1")}
+        endpoint="BANK"
+        canMove={false}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(container.querySelectorAll(".tier-row")).toHaveLength(5);
+    expect([...container.querySelectorAll(".tier-label")].map((label) => label.textContent))
+      .toEqual(["S", "A", "B", "C", "F"]);
+  });
 });

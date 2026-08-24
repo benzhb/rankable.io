@@ -13,6 +13,15 @@ function ids(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function clientCard(card: MediaCard): MediaCard {
+  return {
+    ...card,
+    imageUrl: card.imageUrl.startsWith("data:")
+      ? card.imageUrl
+      : `/media/cards/${encodeURIComponent(card.id)}`,
+  };
+}
+
 export class SnapshotService {
   constructor(private readonly database: PrismaClient) {}
 
@@ -63,7 +72,9 @@ export class SnapshotService {
         const placements: PlacementSnapshot[] = round.placements.map((placement) => ({
           id: placement.cardId,
           title: placement.title,
-          imageUrl: placement.imageUrl,
+          imageUrl: placement.imageUrl.startsWith("data:")
+            ? placement.imageUrl
+            : `/media/cards/${encodeURIComponent(placement.cardId)}`,
           storagePath: placement.storagePath,
           participantId: placement.participantId,
           tier: placement.tier,
@@ -83,7 +94,7 @@ export class SnapshotService {
           resultsEndsAt: round.resultsEndsAt?.toISOString() ?? null,
           cardBank: {
             remainingCount: cardQueue.length,
-            visibleCards: visibleCardWindow(cardQueue),
+            visibleCards: visibleCardWindow(cardQueue).map(clientCard),
           },
           placements,
         };
@@ -112,7 +123,7 @@ export class SnapshotService {
         canSelectCategory: Boolean(isLeader) && session.phase === "LOBBY",
         canStartCountdown: Boolean(isLeader) && session.phase === "LOBBY",
         canCancelCountdown: Boolean(isLeader) && session.phase === "COUNTDOWN",
-        canEndTurn: Boolean(isCurrentPlayer) && roundSnapshot?.currentEndpoint !== "BANK",
+        canEndTurn: Boolean(isCurrentPlayer),
       },
       members: session.participants.map((participant) => ({
         participantId: participant.id,

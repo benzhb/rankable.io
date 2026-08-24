@@ -31,7 +31,6 @@ enum Tier {
   A
   B
   C
-  D
   F
 }
 

@@ -1,6 +1,6 @@
 import type { MediaCard } from "./media.types.js";
 
-export const TIERS = ["S", "A", "B", "C", "D", "F"] as const;
+export const TIERS = ["S", "A", "B", "C", "F"] as const;
 export type Tier = (typeof TIERS)[number];
 export type CardEndpoint = "BANK" | Tier;
 

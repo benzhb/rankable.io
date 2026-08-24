@@ -30,6 +30,45 @@ h1, h2, p { margin-top: 0; }
 ::selection { color: #080808; background: #f7f6f2; }
 :focus-visible { outline: 2px solid #f7f6f2; outline-offset: 3px; }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sound-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #111111;
+}
+.sound-toggle {
+  display: flex;
+  min-width: 3.2rem;
+  min-height: 1.9rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  color: #f7f6f2;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+.sound-toggle:hover { background: #242424; }
+.sound-volume { display: flex; align-items: center; }
+.sound-volume input { width: clamp(3.5rem, 7vw, 5rem); accent-color: #f7f6f2; cursor: pointer; }
+
 .eyebrow {
   display: block;
   margin-bottom: 0.35rem;
