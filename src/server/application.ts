@@ -30,6 +30,7 @@ export function createApplication(database: PrismaClient = prisma) {
   const rounds = new RoundService(database, events, timers);
   sessions.setBeginRoundHandler((roundId) => rounds.beginRound(roundId));
   sessions.setTurnTimeoutHandler((roundId) => rounds.handleTurnTimeout(roundId));
+  sessions.setRosterChangedHandler((roundId) => rounds.handleRosterChanged(roundId));
   const lifecycle = new ConnectionLifecycleService(sessions);
 
   return {

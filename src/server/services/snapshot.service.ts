@@ -50,6 +50,8 @@ export class SnapshotService {
         include: {
           players: { include: { participant: { include: { user: true } } } },
           placements: { orderBy: [{ tier: "asc" }, { sortIndex: "asc" }] },
+          democracyVotes: { include: { participant: { include: { user: true } } } },
+          chaosClaims: { include: { participant: { include: { user: true } } } },
         },
       });
       if (round && ["COUNTDOWN", "PLAYING", "RESULTS"].includes(round.status)) {
@@ -64,7 +66,10 @@ export class SnapshotService {
             participantId,
             username: participant.user.username,
             avatarUrl: participant.user.avatarUrl,
-            isCurrent: index === 0 && round.status === "PLAYING",
+            isCurrent:
+              index === 0 &&
+              round.status === "PLAYING" &&
+              round.gameMode === "PRESENTATION",
             isSelf: participant.userId === userId,
           }];
         });
@@ -85,8 +90,13 @@ export class SnapshotService {
           id: round.id,
           status: round.status as RoundSnapshot["status"],
           categoryKey: round.categoryKey,
+          gameMode: round.gameMode,
           playerQueue,
-          currentPlayerId: round.status === "PLAYING" ? queueIds[0] ?? null : null,
+          currentPlayerId:
+            round.status === "PLAYING" && round.gameMode === "PRESENTATION"
+              ? queueIds[0] ?? null
+              : null,
+          selectedCardId: round.selectedCardId,
           currentEndpoint: round.currentEndpoint as CardEndpoint,
           endpointSequence: round.endpointSequence,
           turnNumber: round.turnNumber,
@@ -96,6 +106,7 @@ export class SnapshotService {
             round.lastSkippedCardTitle && round.lastSkippedAt
               ? {
                   title: round.lastSkippedCardTitle,
+                  count: round.lastSkippedCardCount ?? 1,
                   skippedAt: round.lastSkippedAt.toISOString(),
                 }
               : null,
@@ -104,12 +115,57 @@ export class SnapshotService {
             visibleCards: visibleCardWindow(cardQueue).map(clientCard),
           },
           placements,
+          democracy:
+            round.gameMode === "DEMOCRACY"
+              ? {
+                  phase:
+                    round.status === "PLAYING" && !round.selectedCardId
+                      ? "REVEAL"
+                      : "VOTING",
+                  revealEndsAt:
+                    round.status === "PLAYING" && !round.selectedCardId
+                      ? round.turnEndsAt?.toISOString() ?? null
+                      : null,
+                  lastResolvedCardId: round.lastResolvedCardId,
+                  eligibleVoterCount: queueIds.length,
+                  votes: round.democracyVotes
+                    .filter(
+                      (vote) =>
+                        vote.cardId === round.selectedCardId &&
+                        queueIds.includes(vote.participantId),
+                    )
+                    .map((vote) => ({
+                      participantId: vote.participantId,
+                      username: vote.participant.user.username,
+                      avatarUrl: vote.participant.user.avatarUrl,
+                      choice: vote.hasntTried ? "HAVENT_TRIED" : vote.tier!,
+                      isSelf: vote.participant.userId === userId,
+                    })),
+                }
+              : null,
+          chaos:
+            round.gameMode === "CHAOS"
+              ? {
+                  claims: round.chaosClaims.map((claim) => ({
+                    id: claim.cardId,
+                    title: claim.title,
+                    imageUrl: claim.imageUrl.startsWith("data:")
+                      ? claim.imageUrl
+                      : `/media/cards/${encodeURIComponent(claim.cardId)}`,
+                    storagePath: claim.storagePath,
+                    participantId: claim.participantId,
+                    username: claim.participant.user.username,
+                    isSelf: claim.participant.userId === userId,
+                  })),
+                }
+              : null,
         };
       }
     }
 
     const isCurrentPlayer =
       roundSnapshot?.status === "PLAYING" &&
+      roundSnapshot.gameMode === "PRESENTATION" &&
       roundSnapshot.currentPlayerId === selfParticipant?.id;
 
     return {
@@ -128,9 +184,11 @@ export class SnapshotService {
           !selfParticipant && (session.phase === "LOBBY" || session.phase === "COUNTDOWN"),
         canLeave: Boolean(selfParticipant) && session.phase !== "ENDED",
         canSelectCategory: Boolean(isLeader) && session.phase === "LOBBY",
+        canSelectGameMode: Boolean(isLeader) && session.phase === "LOBBY",
         canStartCountdown: Boolean(isLeader) && session.phase === "LOBBY",
         canCancelCountdown: Boolean(isLeader) && session.phase === "COUNTDOWN",
         canEndTurn: Boolean(isCurrentPlayer),
+        canEndGame: Boolean(isLeader) && session.phase === "PLAYING",
       },
       members: session.participants.map((participant) => ({
         participantId: participant.id,
@@ -146,6 +204,7 @@ export class SnapshotService {
         cardCount: category.cards.length,
       })),
       selectedCategoryKey: session.selectedCategoryKey,
+      selectedGameMode: session.selectedGameMode,
       countdownEndsAt: session.countdownEndsAt?.toISOString() ?? null,
       round: roundSnapshot,
     };

@@ -31,6 +31,14 @@ export function isTier(endpoint: CardEndpoint): endpoint is Tier {
   return TIERS.includes(endpoint as Tier);
 }
 
+export function lowerMedianTier(votes: readonly Tier[]): Tier {
+  if (votes.length === 0) throw new Error("At least one tier vote is required");
+  const ordered = [...votes].sort(
+    (left, right) => TIERS.indexOf(left) - TIERS.indexOf(right),
+  );
+  return ordered[Math.floor(ordered.length / 2)]!;
+}
+
 export function titleFromFilename(filename: string): string {
   const withoutExtension = filename.replace(/\.[^.]+$/, "");
   return withoutExtension

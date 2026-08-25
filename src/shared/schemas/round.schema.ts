@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const tierSchema = z.enum(["S", "A", "B", "C", "F"]);
+export const gameModeSchema = z.enum(["PRESENTATION", "DEMOCRACY", "CHAOS"]);
+export const democracyChoiceSchema = z.union([tierSchema, z.literal("HAVENT_TRIED")]);
 export const cardEndpointSchema = z.enum([
   "BANK",
   "S",
@@ -18,4 +20,16 @@ export const endpointChangeSchema = z.object({
   from: cardEndpointSchema,
   to: cardEndpointSchema,
   sequence: z.number().int().positive(),
+});
+
+export const democracyVoteBodySchema = z.object({
+  choice: democracyChoiceSchema,
+});
+
+export const chaosClaimBodySchema = z.object({
+  cardId: z.string().min(1),
+});
+
+export const chaosPlacementBodySchema = z.object({
+  tier: tierSchema,
 });

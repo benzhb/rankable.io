@@ -40,7 +40,7 @@
 .leader-controls {
   display: grid;
   width: 100%;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto;
   align-items: end;
   gap: 0.75rem;
   padding: 1rem;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isTier,
   labelFromFolder,
+  lowerMedianTier,
   removeFromQueue,
   rotateQueue,
   shuffle,
@@ -37,6 +38,12 @@ describe("game rules", () => {
     expect(isTier("F")).toBe(true);
     expect(isTier("D" as never)).toBe(false);
     expect(isTier("BANK")).toBe(false);
+  });
+
+  it("uses the lower-ranked middle vote for an even democracy result", () => {
+    expect(lowerMedianTier(["S", "A"])).toBe("A");
+    expect(lowerMedianTier(["S", "A", "B", "F"])).toBe("B");
+    expect(lowerMedianTier(["S", "B", "F"])).toBe("B");
   });
 
   it("creates labels from manually uploaded folder and file names", () => {

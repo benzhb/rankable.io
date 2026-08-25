@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { COUNTDOWN_TRACK_MS, playbackDelay } from "../../src/client/audio/ActivitySoundEffects.js";
+import {
+  COUNTDOWN_TRACK_MS,
+  playbackDelay,
+  shouldScheduleTimesUp,
+} from "../../src/client/audio/ActivitySoundEffects.js";
+import { serverRemainingSeconds } from "../../src/client/hooks/useServerTimer.js";
 import { SoundEngine, type SoundTrack } from "../../src/client/audio/sound-engine.js";
 
 function fakeTrack(): SoundTrack & {
@@ -60,5 +65,19 @@ describe("Activity sounds", () => {
 
     expect(playbackDelay(deadline, COUNTDOWN_TRACK_MS, now)).toBe(2_296);
     expect(playbackDelay(new Date(now - 1).toISOString(), 0, now)).toBeNull();
+  });
+
+  it("uses the server clock instead of the device clock for visible timers", () => {
+    const serverTime = "2026-08-23T20:00:00.000Z";
+    const deadline = "2026-08-23T20:00:15.000Z";
+
+    expect(serverRemainingSeconds(deadline, serverTime)).toBe(15);
+    expect(serverRemainingSeconds(deadline, serverTime, 5_001)).toBe(10);
+  });
+
+  it("does not play the turn timeout sound during Democracy voting or reveal", () => {
+    expect(shouldScheduleTimesUp("PLAYING", "DEMOCRACY")).toBe(false);
+    expect(shouldScheduleTimesUp("PLAYING", "PRESENTATION")).toBe(true);
+    expect(shouldScheduleTimesUp("RESULTS", "PRESENTATION")).toBe(false);
   });
 });

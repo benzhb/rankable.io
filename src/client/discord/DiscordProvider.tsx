@@ -10,12 +10,22 @@ import {
 } from "react";
 import type {
   CardEndpoint,
+  DemocracyChoice,
+  GameMode,
   PlayerEmote,
   PlayerEmoteEvent,
+  PresentationDragEvent,
+  Tier,
 } from "../../shared/types/round.types.js";
 import type { SessionSnapshot } from "../../shared/types/session.types.js";
 import { setSessionToken } from "../api/api-client.js";
-import { endTurn as endTurnRequest } from "../api/round.api.js";
+import {
+  castVote as castVoteRequest,
+  claimCard as claimCardRequest,
+  endGame as endGameRequest,
+  endTurn as endTurnRequest,
+  placeClaim as placeClaimRequest,
+} from "../api/round.api.js";
 import {
   cancelCountdown as cancelCountdownRequest,
   joinLobby as joinLobbyRequest,
@@ -30,10 +40,18 @@ interface DiscordContextValue {
   error: string | null;
   joinLobby: () => Promise<void>;
   leaveLobby: () => Promise<void>;
-  startCountdown: (categoryKey: string) => Promise<void>;
+  startCountdown: (categoryKey: string, gameMode: GameMode) => Promise<void>;
   cancelCountdown: () => Promise<void>;
   endTurn: () => Promise<void>;
+  endGame: () => Promise<void>;
+  castVote: (choice: DemocracyChoice) => Promise<void>;
+  claimChaosCard: (cardId: string) => Promise<void>;
+  placeChaosCard: (cardId: string, tier: Tier) => Promise<void>;
   moveCard: (to: CardEndpoint) => void;
+  presentationDrag: PresentationDragEvent | null;
+  startPresentationDrag: (cardId: string, x: number, y: number) => void;
+  movePresentationDrag: (cardId: string, x: number, y: number) => void;
+  endPresentationDrag: (cardId: string) => void;
   emotes: Readonly<Record<string, PlayerEmoteEvent>>;
   sendEmote: (emote: PlayerEmote) => void;
 }
@@ -46,18 +64,43 @@ function socketUrl(): string {
   return url.toString();
 }
 
+export function dragMatchesSnapshot(
+  drag: PresentationDragEvent,
+  snapshot: SessionSnapshot | null,
+): boolean {
+  const round = snapshot?.round;
+  return Boolean(
+    round &&
+      round.status === "PLAYING" &&
+      round.gameMode === "PRESENTATION" &&
+      round.id === drag.roundId &&
+      round.turnNumber === drag.turnNumber &&
+      round.currentPlayerId === drag.participantId &&
+      round.selectedCardId === drag.cardId &&
+      !round.placements.some((placement) => placement.id === drag.cardId),
+  );
+}
+
 export function DiscordProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [emotes, setEmotes] = useState<Record<string, PlayerEmoteEvent>>({});
+  const [presentationDrag, setPresentationDrag] = useState<PresentationDragEvent | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const snapshotRef = useRef<SessionSnapshot | null>(null);
   const tokenRef = useRef<string | null>(null);
   const disposedRef = useRef(false);
   const emoteTimeoutsRef = useRef(new Map<string, number>());
+  const dragSequenceRef = useRef(0);
+  const lastDragSentAtRef = useRef(0);
 
   const acceptSnapshot = useCallback((next: SessionSnapshot) => {
-    setSnapshot((current) => (!current || next.version >= current.version ? next : current));
+    const current = snapshotRef.current;
+    if (current && next.version < current.version) return;
+    snapshotRef.current = next;
+    setSnapshot(next);
+    setPresentationDrag((drag) => drag && dragMatchesSnapshot(drag, next) ? drag : null);
   }, []);
 
   const connect = useCallback((token: string) => {
@@ -76,6 +119,11 @@ export function DiscordProvider({ children }: { children: ReactNode }) {
         participantId?: string;
         emote?: PlayerEmote;
         sentAt?: string;
+        cardId?: string;
+        turnNumber?: number;
+        x?: number;
+        y?: number;
+        sequence?: number;
       };
       if (frame.type === "session.snapshot" && frame.snapshot) {
         acceptSnapshot(frame.snapshot);
@@ -108,6 +156,30 @@ export function DiscordProvider({ children }: { children: ReactNode }) {
           emoteTimeoutsRef.current.delete(event.participantId);
         }, 2_500);
         emoteTimeoutsRef.current.set(event.participantId, timeout);
+      } else if (
+        frame.type === "presentation.drag.position" &&
+        frame.roundId &&
+        frame.participantId &&
+        frame.cardId &&
+        frame.turnNumber !== undefined &&
+        frame.x !== undefined &&
+        frame.y !== undefined &&
+        frame.sequence !== undefined
+      ) {
+        const nextDrag: PresentationDragEvent = {
+          roundId: frame.roundId,
+          participantId: frame.participantId,
+          cardId: frame.cardId,
+          turnNumber: frame.turnNumber,
+          x: frame.x,
+          y: frame.y,
+          sequence: frame.sequence,
+        };
+        if (dragMatchesSnapshot(nextDrag, snapshotRef.current)) {
+          setPresentationDrag(nextDrag);
+        }
+      } else if (frame.type === "presentation.drag.ended" && frame.roundId) {
+        setPresentationDrag((current) => current?.roundId === frame.roundId ? null : current);
       }
     });
     socket.addEventListener("close", () => {
@@ -151,7 +223,9 @@ export function DiscordProvider({ children }: { children: ReactNode }) {
     const current = snapshot;
     const round = current?.round;
     const socket = socketRef.current;
-    const card = round?.cardBank.visibleCards[0];
+    const card = round?.cardBank.visibleCards.find(
+      (candidate) => candidate.id === round.selectedCardId,
+    );
     if (!round || !card || round.status !== "PLAYING" || !socket) return;
     if (round.currentPlayerId !== current.self.participantId || round.currentEndpoint === to) return;
     const sequence = round.endpointSequence + 1;
@@ -170,6 +244,71 @@ export function DiscordProvider({ children }: { children: ReactNode }) {
     });
   }, [snapshot]);
 
+  const startPresentationDrag = useCallback((cardId: string, x: number, y: number) => {
+    const round = snapshot?.round;
+    const socket = socketRef.current;
+    if (!round || round.gameMode !== "PRESENTATION" || socket?.readyState !== WebSocket.OPEN) return;
+    dragSequenceRef.current = 0;
+    lastDragSentAtRef.current = performance.now();
+    socket.send(JSON.stringify({
+      type: "presentation.drag.started",
+      roundId: round.id,
+      turnNumber: round.turnNumber,
+      cardId,
+      x,
+      y,
+    }));
+    setSnapshot((current) => {
+      const currentRound = current?.round;
+      if (!current || !currentRound || currentRound.id !== round.id) return current;
+      const changingCard = currentRound.selectedCardId !== cardId;
+      return {
+        ...current,
+        round: {
+          ...currentRound,
+          selectedCardId: cardId,
+          currentEndpoint: changingCard ? "BANK" : currentRound.currentEndpoint,
+          endpointSequence: changingCard ? 0 : currentRound.endpointSequence,
+        },
+      };
+    });
+  }, [snapshot]);
+
+  const movePresentationDrag = useCallback((cardId: string, x: number, y: number) => {
+    const round = snapshot?.round;
+    const socket = socketRef.current;
+    const now = performance.now();
+    if (
+      !round ||
+      round.gameMode !== "PRESENTATION" ||
+      socket?.readyState !== WebSocket.OPEN ||
+      now - lastDragSentAtRef.current < 50
+    ) return;
+    lastDragSentAtRef.current = now;
+    const sequence = ++dragSequenceRef.current;
+    socket.send(JSON.stringify({
+      type: "presentation.drag.moved",
+      roundId: round.id,
+      turnNumber: round.turnNumber,
+      cardId,
+      x,
+      y,
+      sequence,
+    }));
+  }, [snapshot]);
+
+  const endPresentationDrag = useCallback((cardId: string) => {
+    const round = snapshot?.round;
+    const socket = socketRef.current;
+    if (!round || round.gameMode !== "PRESENTATION" || socket?.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({
+      type: "presentation.drag.ended",
+      roundId: round.id,
+      turnNumber: round.turnNumber,
+      cardId,
+    }));
+  }, [snapshot]);
+
   const sendEmote = useCallback((emote: PlayerEmote) => {
     const round = snapshot?.round;
     const socket = socketRef.current;
@@ -183,21 +322,52 @@ export function DiscordProvider({ children }: { children: ReactNode }) {
     emoteTimeoutsRef.current.clear();
   }, [snapshot?.round?.id]);
 
+  useEffect(() => setPresentationDrag(null), [snapshot?.round?.id, snapshot?.round?.turnNumber]);
+
   const value = useMemo<DiscordContextValue>(() => ({
     snapshot,
     loading,
     error,
     joinLobby: () => run(joinLobbyRequest),
     leaveLobby: () => run(leaveLobbyRequest),
-    startCountdown: (categoryKey) => run(() => startCountdownRequest(categoryKey)),
+    startCountdown: (categoryKey, gameMode) =>
+      run(() => startCountdownRequest(categoryKey, gameMode)),
     cancelCountdown: () => run(cancelCountdownRequest),
     endTurn: async () => {
       if (snapshot?.round) await run(() => endTurnRequest(snapshot.round!.id));
     },
+    endGame: async () => {
+      if (snapshot?.round) await run(() => endGameRequest(snapshot.round!.id));
+    },
+    castVote: async (choice) => {
+      if (snapshot?.round) await run(() => castVoteRequest(snapshot.round!.id, choice));
+    },
+    claimChaosCard: async (cardId) => {
+      if (snapshot?.round) await run(() => claimCardRequest(snapshot.round!.id, cardId));
+    },
+    placeChaosCard: async (cardId, tier) => {
+      if (snapshot?.round) await run(() => placeClaimRequest(snapshot.round!.id, cardId, tier));
+    },
     moveCard,
+    presentationDrag,
+    startPresentationDrag,
+    movePresentationDrag,
+    endPresentationDrag,
     emotes,
     sendEmote,
-  }), [snapshot, loading, error, run, moveCard, emotes, sendEmote]);
+  }), [
+    snapshot,
+    loading,
+    error,
+    run,
+    moveCard,
+    presentationDrag,
+    startPresentationDrag,
+    movePresentationDrag,
+    endPresentationDrag,
+    emotes,
+    sendEmote,
+  ]);
 
   return <DiscordContext.Provider value={value}>{children}</DiscordContext.Provider>;
 }

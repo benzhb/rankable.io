@@ -30,7 +30,10 @@ export function HomePage() {
         />
 
         {snapshot.phase === "COUNTDOWN" && (
-          <CountdownTimer deadline={snapshot.countdownEndsAt} />
+          <CountdownTimer
+            deadline={snapshot.countdownEndsAt}
+            serverTime={snapshot.serverTime}
+          />
         )}
 
         {activity.error && <ActivityError message={activity.error} />}

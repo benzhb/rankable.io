@@ -1,5 +1,5 @@
 import type { MediaCategorySummary } from "./media.types.js";
-import type { RoundSnapshot } from "./round.types.js";
+import type { GameMode, RoundSnapshot } from "./round.types.js";
 
 export type SessionPhase =
   | "LOBBY"
@@ -32,13 +32,16 @@ export interface SessionSnapshot {
     canJoin: boolean;
     canLeave: boolean;
     canSelectCategory: boolean;
+    canSelectGameMode: boolean;
     canStartCountdown: boolean;
     canCancelCountdown: boolean;
     canEndTurn: boolean;
+    canEndGame: boolean;
   };
   members: LobbyMemberSnapshot[];
   categories: MediaCategorySummary[];
   selectedCategoryKey: string | null;
+  selectedGameMode: GameMode;
   countdownEndsAt: string | null;
   round: RoundSnapshot | null;
 }

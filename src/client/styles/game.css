@@ -30,6 +30,7 @@
   letter-spacing: -0.04em;
 }
 .game-header h1 { overflow: hidden; margin: 0; font-size: clamp(1.15rem, 3vh, 1.75rem); text-overflow: ellipsis; text-transform: capitalize; white-space: nowrap; }
+.game-mode-pill { align-self: center; padding: 0.28rem 0.55rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #111111; font-size: 0.65rem; font-weight: 850; letter-spacing: 0.05em; text-transform: uppercase; }
 .turn-clock {
   display: flex;
   align-items: center;
@@ -51,6 +52,7 @@
   font-size: 1.2rem;
 }
 .turn-clock--urgent strong { animation: pulse 900ms ease-in-out infinite alternate; }
+.turn-clock--chaos { padding: 0.65rem 0.85rem; }
 @keyframes pulse { to { opacity: 0.55; } }
 .game-layout {
   display: grid;
@@ -122,6 +124,8 @@
 }
 .media-card[draggable="true"] { cursor: grab; }
 .media-card[draggable="true"]:active { cursor: grabbing; }
+.media-card--interactive { cursor: pointer; transition: border-color 120ms ease, transform 120ms ease; }
+.media-card--interactive:hover { border-color: #f7f6f2; transform: translateY(-2px); }
 .media-card img { display: block; width: 100%; min-height: 0; flex: 1; background: #050505; object-fit: contain; }
 .media-card span {
   overflow: hidden;
@@ -138,6 +142,14 @@
   animation: card-arrive 220ms ease-out;
 }
 @keyframes card-arrive { from { opacity: 0.45; transform: translateY(8px); } }
+.media-card--highlighted {
+  z-index: 2;
+  animation: democracy-placement-highlight 2s ease-out;
+}
+@keyframes democracy-placement-highlight {
+  0%, 30% { border-color: #ffffff; transform: translateY(-3px) scale(1.1); box-shadow: 0 0 0 3px #ffffff, 0 0 26px rgba(255, 255, 255, 0.85); }
+  100% { border-color: #3b3b3b; transform: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24); }
+}
 .media-card--placeholder { display: grid; place-items: center; color: var(--muted); border-style: dashed; font-size: 0.7rem; font-weight: 800; }
 .emote-menu { position: absolute; z-index: 4; top: 0.4rem; right: 0.45rem; display: flex; align-items: center; gap: 0.3rem; }
 .emote-menu__panel { display: flex; gap: 0.25rem; padding: 0.2rem; border: 1px solid var(--line-strong); border-radius: 999px; background: #171717; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); animation: emote-menu-in 120ms ease-out; }
@@ -184,6 +196,18 @@
 .queued-player--current .queue-position { color: #080808; }
 .turn-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: #080808; }
 .end-turn { display: block; width: 100%; min-width: 0; min-height: clamp(2.35rem, 6vh, 2.9rem); margin: 0; }
+.end-game-button {
+  position: absolute;
+  z-index: 16;
+  right: max(0.7rem, env(safe-area-inset-right));
+  bottom: max(0.55rem, env(safe-area-inset-bottom));
+  width: clamp(7.5rem, 18vw, 10rem);
+  min-height: clamp(2.35rem, 6vh, 2.9rem);
+  border-color: #ff7f7f;
+  color: #ff9a9a;
+  background: #170b0b;
+}
+.end-game-button:not(:disabled):hover { color: #080808; background: #ff7f7f; }
 .card-bank {
   display: grid;
   min-height: 0;
@@ -202,6 +226,33 @@
 .card-bank__title h2 { margin: 0; color: #f7f6f2; font-size: 1.05rem; }
 .card-bank__row { display: flex; height: clamp(3.9rem, 13vh, 5.8rem); min-height: 0; gap: clamp(0.3rem, 0.8vw, 0.55rem); overflow: hidden; }
 .card-bank__row .media-card { height: 100%; max-height: none; }
+.chaos-held-card { position: relative; display: flex; height: 100%; flex: 0 0 auto; align-items: stretch; padding-left: 0.35rem; border-left: 2px solid #f7f6f2; }
+.chaos-held-card > span { position: absolute; z-index: 2; top: 0.2rem; left: 0.55rem; padding: 0.12rem 0.3rem; border-radius: 999px; color: #080808; background: #f7f6f2; font-size: 0.5rem; font-weight: 950; text-transform: uppercase; }
+.presentation-drag-ghost { position: fixed; z-index: 20; width: clamp(3.5rem, 6vw, 5rem); overflow: hidden; border: 2px solid #f7f6f2; border-radius: 0.7rem; background: #111111; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55); pointer-events: none; transform: translate(-50%, -50%) rotate(-2deg); }
+.presentation-drag-ghost img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: contain; }
+.presentation-drag-ghost span { display: block; overflow: hidden; padding: 0.25rem 0.35rem; color: #080808; background: #f7f6f2; font-size: 0.58rem; font-weight: 900; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.democracy-backdrop { position: fixed; z-index: 12; inset: 0; display: grid; padding: 1rem; place-items: center; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(5px); }
+.democracy-modal { width: min(100%, 42rem); max-height: calc(100dvh - 2rem); overflow: hidden; padding: clamp(0.75rem, 2vh, 1rem); border: 1px solid #f7f6f2; border-radius: 1.15rem; background: #0d0d0d; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7); }
+.democracy-card { display: grid; grid-template-columns: clamp(4rem, 11vh, 6.5rem) minmax(0, 1fr); align-items: center; gap: 0.85rem; margin-bottom: 0.75rem; }
+.democracy-card img { width: 100%; max-height: 8rem; aspect-ratio: 4 / 5; border: 1px solid var(--line-strong); border-radius: 0.65rem; background: #050505; object-fit: contain; }
+.democracy-card h2 { overflow: hidden; margin: 0 0 0.25rem; font-size: clamp(1.15rem, 3vh, 1.7rem); text-overflow: ellipsis; white-space: nowrap; }
+.democracy-card p { margin: 0; color: var(--muted); font-size: 0.78rem; }
+.democracy-options { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.3rem; }
+.democracy-option { display: grid; min-width: 0; grid-template-columns: 3.25rem minmax(0, 1fr); align-items: center; gap: 0.55rem; }
+.democracy-voters { display: flex; min-height: 2.1rem; align-items: center; gap: 0.35rem; overflow-x: auto; overflow-y: hidden; }
+.democracy-voter { display: flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: 0.3rem; padding: 0.15rem 0.45rem 0.15rem 0.2rem; border: 1px solid #303030; border-radius: 999px; color: #f7f6f2; background: #171717; font-size: 0.68rem; font-weight: 800; }
+.democracy-voter .avatar { width: 1.65rem; height: 1.65rem; flex: 0 0 auto; }
+.democracy-voter span { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.democracy-tier-button { min-height: clamp(2.8rem, 8vh, 3.5rem); border: 1px solid #080808; border-radius: 0.65rem; color: #080808; font-size: 1.35rem; font-weight: 950; }
+.democracy-option--s .democracy-tier-button { background: #ff7f7f; }
+.democracy-option--a .democracy-tier-button { background: #ffbf7f; }
+.democracy-option--b .democracy-tier-button { background: #ffdf7f; }
+.democracy-option--c .democracy-tier-button { background: #ffff7f; }
+.democracy-option--f .democracy-tier-button { background: #7fff7f; }
+.democracy-tier-button:not(:disabled):hover { transform: translateY(-2px); filter: brightness(1.08); }
+.democracy-abstain { display: flex; width: 100%; min-height: 2.5rem; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.65rem; }
+.democracy-abstain span { display: grid; min-width: 1.4rem; height: 1.4rem; padding-inline: 0.25rem; place-items: center; border-radius: 999px; color: #080808; background: #f7f6f2; font-size: 0.68rem; }
+.democracy-locked { margin: 0.55rem 0 0; color: var(--muted); font-size: 0.74rem; text-align: center; }
 .game-error { position: absolute; z-index: 5; top: 4.5rem; left: 50%; width: min(90%, 34rem); transform: translateX(-50%); }
 .game-error .activity-error { width: 100%; }
 .results-banner {
@@ -238,6 +289,7 @@
   .game-header-actions .sound-toggle > span:last-child { display: none; }
   .game-header-actions .sound-toggle { min-width: 1.9rem; }
   .game-heading { gap: 0.5rem; }
+  .game-mode-pill { display: none; }
   .turn-clock { gap: 0.35rem; padding-left: 0.5rem; font-size: 0.68rem; }
   .tier-row { grid-template-columns: 3rem 1fr; }
   .tier-label { font-size: 1.5rem; }
@@ -252,4 +304,10 @@
   .game-wordmark { font-size: 0.9rem; }
   .media-card span { padding-block: 0.2rem; font-size: 0.55rem; }
   .player-queue > .eyebrow { display: none; }
+  .democracy-modal { padding: 0.65rem; }
+  .democracy-card { grid-template-columns: 3.6rem 1fr; margin-bottom: 0.45rem; }
+  .democracy-options { gap: 0.25rem; }
+  .democracy-voters { min-height: 1.55rem; }
+  .democracy-voters .avatar { width: 1.4rem; height: 1.4rem; }
+  .democracy-tier-button { min-height: 2.4rem; }
 }

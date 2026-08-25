@@ -40,7 +40,11 @@ export class SessionController {
   startCountdown = async (request: Request, response: Response, next: NextFunction) => {
     try {
       const auth = request.auth!;
-      await this.sessions.startCountdown(auth, request.body.categoryKey as string);
+      await this.sessions.startCountdown(
+        auth,
+        request.body.categoryKey as string,
+        request.body.gameMode as "PRESENTATION" | "DEMOCRACY" | "CHAOS",
+      );
       response.status(201).json(await this.snapshots.get(auth.sessionId, auth.userId));
     } catch (error) {
       next(error);

@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "../../generated/prisma/client.js";
 import type { AuthContext } from "../models/auth-context.js";
 import type { MediaCatalog, MediaCard } from "../../shared/types/media.types.js";
+import type { GameMode } from "../../shared/types/round.types.js";
 import { env } from "../config/env.js";
 import { withSerializableTransaction } from "../infrastructure/transaction-retry.js";
 import { AppError } from "../models/app-error.js";
@@ -23,6 +24,7 @@ function asJson(value: unknown): Prisma.InputJsonValue {
 export class SessionService {
   private beginRoundHandler: ((roundId: string) => Promise<void>) | null = null;
   private turnTimeoutHandler: ((roundId: string) => Promise<void>) | null = null;
+  private rosterChangedHandler: ((roundId: string) => Promise<void>) | null = null;
 
   constructor(
     private readonly database: PrismaClient,
@@ -36,6 +38,10 @@ export class SessionService {
 
   setTurnTimeoutHandler(handler: (roundId: string) => Promise<void>): void {
     this.turnTimeoutHandler = handler;
+  }
+
+  setRosterChangedHandler(handler: (roundId: string) => Promise<void>): void {
+    this.rosterChangedHandler = handler;
   }
 
   async join(context: AuthContext): Promise<void> {
@@ -102,10 +108,12 @@ export class SessionService {
   async leave(context: AuthContext, reason: "MANUAL" | "DISCONNECTED" = "MANUAL"): Promise<void> {
     let canceledRoundId: string | null = null;
     let nextTurn: { roundId: string; deadline: Date } | null = null;
+    let rosterChangedRoundId: string | null = null;
 
     await withSerializableTransaction(this.database, async (transaction) => {
       canceledRoundId = null;
       nextTurn = null;
+      rosterChangedRoundId = null;
       const session = await transaction.activitySession.findUnique({
         where: { id: context.sessionId },
       });
@@ -134,6 +142,15 @@ export class SessionService {
             where: { roundId: round.id, participantId: participant.id },
             data: { active: false, removedAt: new Date() },
           });
+          if (round.gameMode === "DEMOCRACY" && round.selectedCardId) {
+            await transaction.democracyVote.deleteMany({
+              where: {
+                roundId: round.id,
+                cardId: round.selectedCardId,
+                participantId: participant.id,
+              },
+            });
+          }
 
           if (session.phase === "COUNTDOWN") {
             if (nextQueue.length < env.minPlayers) {
@@ -152,13 +169,14 @@ export class SessionService {
               });
             }
           } else if (session.phase === "PLAYING") {
-            if (wasCurrent) {
+            rosterChangedRoundId = round.id;
+            if (round.gameMode === "PRESENTATION" && wasCurrent) {
               await transaction.turn.create({
                 data: {
                   roundId: round.id,
                   participantId: participant.id,
                   turnNumber: round.turnNumber,
-                  cardId: cards(round.cardQueue)[0]?.id,
+                  cardId: round.selectedCardId,
                   startedAt: new Date(
                     (round.turnEndsAt?.getTime() ?? Date.now()) - env.turnSeconds * 1_000,
                   ),
@@ -168,33 +186,64 @@ export class SessionService {
               });
             }
             if (nextQueue.length === 0) {
+              canceledRoundId = round.id;
               phase = "LOBBY";
               activeRoundId = null;
+              if (round.gameMode === "CHAOS") {
+                await transaction.chaosClaim.deleteMany({ where: { roundId: round.id } });
+              }
               await transaction.round.update({
                 where: { id: round.id },
                 data: {
                   status: "CANCELED",
                   playerQueue: asJson(nextQueue),
+                  selectedCardId: null,
                   currentEndpoint: "BANK",
                   turnEndsAt: null,
                   completedAt: new Date(),
                 },
               });
             } else {
-              const deadline = wasCurrent
+              let nextCardQueue = cards(round.cardQueue);
+              if (round.gameMode === "CHAOS") {
+                const claims = await transaction.chaosClaim.findMany({
+                  where: { roundId: round.id, participantId: participant.id },
+                });
+                if (claims.length > 0) {
+                  nextCardQueue = [
+                    ...claims.map((claim) => ({
+                      id: claim.cardId,
+                      title: claim.title,
+                      imageUrl: claim.imageUrl,
+                      storagePath: claim.storagePath,
+                    })),
+                    ...nextCardQueue,
+                  ];
+                  await transaction.chaosClaim.deleteMany({
+                    where: { roundId: round.id, participantId: participant.id },
+                  });
+                }
+              }
+              const advancesTurn = round.gameMode === "PRESENTATION" && wasCurrent;
+              const deadline = advancesTurn
                 ? new Date(Date.now() + env.turnSeconds * 1_000)
                 : round.turnEndsAt;
               await transaction.round.update({
                 where: { id: round.id },
                 data: {
                   playerQueue: asJson(nextQueue),
-                  currentEndpoint: wasCurrent ? "BANK" : round.currentEndpoint,
-                  endpointSequence: wasCurrent ? 0 : round.endpointSequence,
-                  turnNumber: wasCurrent ? { increment: 1 } : round.turnNumber,
+                  cardQueue: asJson(nextCardQueue),
+                  selectedCardId: advancesTurn ? null : round.selectedCardId,
+                  passParticipantIds: asJson(
+                    ids(round.passParticipantIds).filter((id) => id !== participant.id),
+                  ),
+                  currentEndpoint: advancesTurn ? "BANK" : round.currentEndpoint,
+                  endpointSequence: advancesTurn ? 0 : round.endpointSequence,
+                  turnNumber: advancesTurn ? { increment: 1 } : round.turnNumber,
                   turnEndsAt: deadline,
                 },
               });
-              if (wasCurrent && deadline) nextTurn = { roundId: round.id, deadline };
+              if (advancesTurn && deadline) nextTurn = { roundId: round.id, deadline };
             }
           }
         }
@@ -221,18 +270,29 @@ export class SessionService {
       });
     });
 
-    if (canceledRoundId) this.timers.cancel(`countdown:${canceledRoundId}`);
+    if (canceledRoundId) {
+      this.timers.cancel(`countdown:${canceledRoundId}`);
+      this.timers.cancel(`turn:${canceledRoundId}`);
+    }
     const scheduledTurn = nextTurn as { roundId: string; deadline: Date } | null;
     if (scheduledTurn) {
       this.timers.schedule(`turn:${scheduledTurn.roundId}`, scheduledTurn.deadline, async () => {
         await this.turnTimeoutHandler?.(scheduledTurn.roundId);
       });
     }
+    const changedRound = rosterChangedRoundId as string | null;
+    if (changedRound && changedRound !== canceledRoundId) {
+      await this.rosterChangedHandler?.(changedRound);
+    }
     await this.events.emit(context.sessionId);
     void reason;
   }
 
-  async startCountdown(context: AuthContext, categoryKey: string): Promise<string> {
+  async startCountdown(
+    context: AuthContext,
+    categoryKey: string,
+    gameMode: GameMode,
+  ): Promise<string> {
     const result = await withSerializableTransaction(this.database, async (transaction) => {
       const session = await transaction.activitySession.findUnique({
         where: { id: context.sessionId },
@@ -265,6 +325,7 @@ export class SessionService {
         data: {
           sessionId: session.id,
           categoryKey,
+          gameMode,
           playerQueue: asJson(playerQueue),
           cardQueue: asJson(cardQueue),
           players: {
@@ -280,6 +341,7 @@ export class SessionService {
         data: {
           phase: "COUNTDOWN",
           selectedCategoryKey: categoryKey,
+          selectedGameMode: gameMode,
           activeRoundId: round.id,
           countdownEndsAt: deadline,
           resultsEndsAt: null,

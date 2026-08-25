@@ -16,6 +16,17 @@ describe("public schemas", () => {
     expect(startCountdownBodySchema.safeParse({ categoryKey: "" }).success).toBe(false);
   });
 
+  it("requires a supported game mode when starting", () => {
+    expect(startCountdownBodySchema.safeParse({
+      categoryKey: "anime",
+      gameMode: "DEMOCRACY",
+    }).success).toBe(true);
+    expect(startCountdownBodySchema.safeParse({
+      categoryKey: "anime",
+      gameMode: "SOLITAIRE",
+    }).success).toBe(false);
+  });
+
   it("accepts semantic endpoint changes", () => {
     const frame = {
       type: "turn.card.endpoint-changed" as const,
@@ -35,6 +46,27 @@ describe("public schemas", () => {
       type: "turn.drag.moved",
       x: 10,
       y: 20,
+    }).success).toBe(false);
+  });
+
+  it("accepts normalized Presentation drag positions", () => {
+    expect(websocketClientFrameSchema.safeParse({
+      type: "presentation.drag.moved",
+      roundId: "round-1",
+      turnNumber: 3,
+      cardId: "card-2",
+      x: 0.42,
+      y: 0.73,
+      sequence: 4,
+    }).success).toBe(true);
+    expect(websocketClientFrameSchema.safeParse({
+      type: "presentation.drag.moved",
+      roundId: "round-1",
+      turnNumber: 3,
+      cardId: "card-2",
+      x: 420,
+      y: 730,
+      sequence: 4,
     }).success).toBe(false);
   });
 

@@ -1,6 +1,7 @@
 import type { CardEndpoint, PlacementSnapshot, Tier } from "../../../shared/types/round.types.js";
 import { TIERS } from "../../../shared/types/round.types.js";
 import type { MediaCard } from "../../../shared/types/media.types.js";
+import type { DragEvent } from "react";
 import { MediaCardView } from "./MediaCardView.js";
 
 const tierClass: Record<Tier, string> = {
@@ -17,12 +18,20 @@ export function TierList({
   endpoint,
   canMove,
   onMove,
+  onActiveDragStart,
+  onActiveDrag,
+  onActiveDragEnd,
+  highlightedCardId,
 }: {
   placements: PlacementSnapshot[];
   activeCard: MediaCard | null;
   endpoint: CardEndpoint;
   canMove: boolean;
   onMove: (tier: Tier) => void;
+  onActiveDragStart?: (card: MediaCard, event: DragEvent<HTMLElement>) => void;
+  onActiveDrag?: (card: MediaCard, event: DragEvent<HTMLElement>) => void;
+  onActiveDragEnd?: (card: MediaCard, event: DragEvent<HTMLElement>) => void;
+  highlightedCardId?: string | null;
 }) {
   return (
     <section className="tier-list" aria-label="Tier list">
@@ -43,10 +52,21 @@ export function TierList({
             {placements
               .filter((placement) => placement.tier === tier)
               .map((placement) => (
-                <MediaCardView key={placement.id} card={placement} />
+                <MediaCardView
+                  key={placement.id}
+                  card={placement}
+                  highlighted={placement.id === highlightedCardId}
+                />
               ))}
             {activeCard && endpoint === tier && (
-              <MediaCardView card={activeCard} draggable={canMove} active />
+              <MediaCardView
+                card={activeCard}
+                draggable={canMove}
+                active
+                onDragStart={(event) => onActiveDragStart?.(activeCard, event)}
+                onDrag={(event) => onActiveDrag?.(activeCard, event)}
+                onDragEnd={(event) => onActiveDragEnd?.(activeCard, event)}
+              />
             )}
           </div>
         </div>

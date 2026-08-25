@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LobbyList } from "../../src/client/components/home/LobbyList.js";
 import { CardBank } from "../../src/client/components/game/CardBank.js";
@@ -7,6 +7,7 @@ import { PlayerQueue } from "../../src/client/components/game/PlayerQueue.js";
 import { TierList } from "../../src/client/components/game/TierList.js";
 import { EmoteMenu } from "../../src/client/components/game/EmoteMenu.js";
 import { SkipNotice } from "../../src/client/components/game/SkipNotice.js";
+import { DemocracyVoteModal } from "../../src/client/components/game/DemocracyVoteModal.js";
 
 const card = (id: string) => ({
   id,
@@ -42,6 +43,40 @@ describe("lobby and game layouts", () => {
     );
     expect(screen.getAllByText(/Card [1-5]/)).toHaveLength(5);
     expect(container.querySelectorAll('[draggable="true"]')).toHaveLength(1);
+  });
+
+  it("lets Presentation players choose any of the five visible cards", () => {
+    const { container } = render(
+      <CardBank
+        cards={[1, 2, 3, 4, 5].map((id) => card(String(id)))}
+        remainingCount={12}
+        endpoint="BANK"
+        canMove
+        allowAnyCard
+        onReturn={() => undefined}
+      />,
+    );
+    expect(container.querySelectorAll('[draggable="true"]')).toHaveLength(5);
+  });
+
+  it("highlights only the claimed card in Chaos mode", () => {
+    const { container } = render(
+      <CardBank
+        cards={[card("1"), card("2")]}
+        remainingCount={2}
+        endpoint="BANK"
+        canMove
+        onReturn={() => undefined}
+        highlightFrontCard={false}
+        heldCard={card("3")}
+      />,
+    );
+
+    const activeCards = container.querySelectorAll(".media-card--active");
+    expect(activeCards).toHaveLength(1);
+    expect(activeCards[0]).toHaveTextContent("Card 3");
+    expect(container.querySelector('[data-card-id="1"]'))
+      .not.toHaveClass("media-card--active");
   });
 
   it("orders the current player first and highlights them", () => {
@@ -118,9 +153,54 @@ describe("lobby and game layouts", () => {
   it("announces a freshly skipped card", () => {
     render(<SkipNotice skippedCard={{
       title: "Mystery Show",
+      count: 1,
       skippedAt: new Date().toISOString(),
     }} />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Mystery Show was skipped");
+  });
+
+  it("shows tier votes and Haven't tried in the Democracy modal", () => {
+    const vote = vi.fn();
+    render(
+      <DemocracyVoteModal
+        card={card("1")}
+        votes={[{
+          participantId: "p1",
+          username: "Mina",
+          avatarUrl: "/mina.png",
+          choice: "S",
+          isSelf: false,
+        }]}
+        eligibleVoterCount={2}
+        remaining={12}
+        disabled={false}
+        onVote={vote}
+      />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Vote on Card 1" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByAltText("Mina's profile")).toBeInTheDocument();
+    expect(within(dialog).getByText("Mina")).toBeInTheDocument();
+    const sButton = within(dialog).getByRole("button", { name: "S" });
+    expect(sButton.compareDocumentPosition(within(dialog).getByLabelText("S voters")))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Haven't tried" }));
+    expect(vote).toHaveBeenCalledWith("HAVENT_TRIED");
+  });
+
+  it("highlights the Democracy placement during the reveal pause", () => {
+    const { container } = render(
+      <TierList
+        placements={[{ ...card("1"), participantId: null, tier: "A", sortIndex: 0 }]}
+        activeCard={null}
+        endpoint="BANK"
+        canMove={false}
+        onMove={() => undefined}
+        highlightedCardId="1"
+      />,
+    );
+
+    expect(container.querySelector(".media-card--highlighted")).toHaveTextContent("Card 1");
   });
 });

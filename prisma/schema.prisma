@@ -40,6 +40,12 @@ enum TurnEndReason {
   DISCONNECTED
 }
 
+enum GameMode {
+  PRESENTATION
+  DEMOCRACY
+  CHAOS
+}
+
 model DiscordUser {
   id             String          @id
   username       String
@@ -58,6 +64,7 @@ model ActivitySession {
   phase               SessionPhase          @default(LOBBY)
   leaderParticipantId String?
   selectedCategoryKey String?
+  selectedGameMode    GameMode               @default(PRESENTATION)
   activeRoundId       String?
   countdownEndsAt     DateTime?
   resultsEndsAt       DateTime?
@@ -86,6 +93,8 @@ model Participant {
   roundPlayers RoundParticipant[]
   turns        Turn[]
   placements   Placement[]
+  democracyVotes DemocracyVote[]
+  chaosClaims    ChaosClaim[]
 
   @@unique([sessionId, userId])
   @@index([sessionId, active, joinOrder])
@@ -118,16 +127,21 @@ model Round {
   id               String             @id @default(uuid())
   sessionId        String
   categoryKey      String
+  gameMode         GameMode            @default(PRESENTATION)
   status           RoundStatus        @default(COUNTDOWN)
   playerQueue      Json
   cardQueue        Json
+  selectedCardId   String?
+  passParticipantIds Json              @default("[]")
   currentEndpoint  String             @default("BANK")
   endpointSequence Int                @default(0)
   turnNumber       Int                @default(0)
   turnEndsAt       DateTime?
   resultsEndsAt    DateTime?
   lastSkippedCardTitle String?
+  lastSkippedCardCount Int?
   lastSkippedAt    DateTime?
+  lastResolvedCardId String?
   createdAt        DateTime           @default(now())
   startedAt        DateTime?
   completedAt      DateTime?
@@ -135,6 +149,8 @@ model Round {
   players          RoundParticipant[]
   turns            Turn[]
   placements       Placement[]
+  democracyVotes   DemocracyVote[]
+  chaosClaims      ChaosClaim[]
 
   @@index([sessionId, status])
 }
@@ -172,7 +188,7 @@ model Turn {
 model Placement {
   id            String      @id @default(uuid())
   roundId       String
-  participantId String
+  participantId String?
   cardId        String
   title         String
   imageUrl      String
@@ -181,8 +197,40 @@ model Placement {
   sortIndex     Int
   createdAt     DateTime    @default(now())
   round         Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participant   Participant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
 
   @@unique([roundId, cardId])
   @@index([roundId, tier, sortIndex])
+}
+
+model DemocracyVote {
+  id            String      @id @default(uuid())
+  roundId       String
+  participantId String
+  cardId        String
+  tier          Tier?
+  hasntTried    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  round         Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, cardId, participantId])
+  @@index([roundId, cardId])
+}
+
+model ChaosClaim {
+  id            String      @id @default(uuid())
+  roundId       String
+  participantId String
+  cardId        String
+  title         String
+  imageUrl      String
+  storagePath   String
+  claimedAt     DateTime    @default(now())
+  round         Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, cardId])
+  @@unique([roundId, participantId])
+  @@index([roundId])
 }

@@ -9,14 +9,16 @@ const emoteSymbol = {
   THUMBS_DOWN: "👎",
 } as const;
 
-export function PlayerQueue({ players, emotes = {} }: {
+export function PlayerQueue({ players, emotes = {}, eyebrow = "Turn order", title = "Player queue" }: {
   players: QueuedPlayerSnapshot[];
   emotes?: Readonly<Record<string, PlayerEmoteEvent>>;
+  eyebrow?: string;
+  title?: string;
 }) {
   return (
     <aside className="player-queue" aria-labelledby="queue-heading">
-      <span className="eyebrow">Turn order</span>
-      <h2 id="queue-heading">Player queue</h2>
+      <span className="eyebrow">{eyebrow}</span>
+      <h2 id="queue-heading">{title}</h2>
       <div className="player-queue__list">
         {players.map((player, index) => (
           <div

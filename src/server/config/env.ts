@@ -38,6 +38,7 @@ export const env = {
   sessionTokenTtlSeconds: integer("SESSION_TOKEN_TTL_SECONDS", 21_600),
   countdownSeconds: integer("COUNTDOWN_SECONDS", 10),
   turnSeconds: integer("TURN_SECONDS", 15),
+  democracyRevealSeconds: integer("DEMOCRACY_REVEAL_SECONDS", 5),
   resultsSeconds: integer("RESULTS_SECONDS", 10),
   minPlayers: integer("MIN_PLAYERS", 2),
 };

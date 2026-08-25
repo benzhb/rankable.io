@@ -1,7 +1,10 @@
 import { useServerTimer } from "../../hooks/useServerTimer.js";
 
-export function ResultsOverlay({ deadline }: { deadline: string | null }) {
-  const remaining = useServerTimer(deadline);
+export function ResultsOverlay({ deadline, serverTime }: {
+  deadline: string | null;
+  serverTime: string;
+}) {
+  const remaining = useServerTimer(deadline, serverTime);
   return (
     <div className="results-banner" role="timer">
       <div><span className="eyebrow">Final ranking</span><strong>That’s the list.</strong></div>
