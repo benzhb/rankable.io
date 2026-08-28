@@ -21,16 +21,16 @@ app.use(errorHandler);
 await application.rounds.restoreTimers();
 
 httpServer.listen(env.port, () => {
-  console.log(`Rankable listening on http://localhost:${env.port}`);
+    console.log(`Rankable listening on http://localhost:${env.port}`);
 });
 
 async function shutdown(): Promise<void> {
-  application.timers.stopAll();
-  await webSockets.close();
-  await new Promise<void>((resolve, reject) => {
-    httpServer.close((error) => (error ? reject(error) : resolve()));
-  });
-  await application.database.$disconnect();
+    application.timers.stopAll();
+    await webSockets.close();
+    await new Promise<void>((resolve, reject) => {
+        httpServer.close((error) => (error ? reject(error) : resolve()));
+    });
+    await application.database.$disconnect();
 }
 
 process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
