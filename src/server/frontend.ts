@@ -4,6 +4,10 @@ import path from "node:path";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { isProduction } from "./config/env.js";
 
+export function isFrontendDocumentRequest(method: string, acceptsHtml: boolean): boolean {
+  return (method === "GET" || method === "HEAD") && acceptsHtml;
+}
+
 export async function attachFrontend(app: Express, httpServer: HttpServer): Promise<void> {
   if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");
@@ -28,7 +32,7 @@ export async function attachFrontend(app: Express, httpServer: HttpServer): Prom
   );
   app.use(express.static(clientDirectory, { index: false, maxAge: "1h" }));
   app.use(async (request: Request, response: Response, next: NextFunction) => {
-    if (request.method !== "GET" || !request.accepts("html")) return next();
+    if (!isFrontendDocumentRequest(request.method, Boolean(request.accepts("html")))) return next();
     try {
       const html = await readFile(path.join(clientDirectory, "index.html"), "utf8");
       response.setHeader("Cache-Control", "no-store");
