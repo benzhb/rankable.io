@@ -70,6 +70,12 @@ export function HomePage() {
           <p className="join-note">Joining now cancels the countdown so the leader can restart it.</p>
         )}
       </div>
+
+      <footer className="home-legal-links" aria-label="Legal">
+        <a href="/privacy" target="_blank" rel="noreferrer">Privacy</a>
+        <span aria-hidden="true">·</span>
+        <a href="/tos" target="_blank" rel="noreferrer">Terms</a>
+      </footer>
     </main>
   );
 }

@@ -139,6 +139,16 @@
 .empty-lobby { margin: 0; padding: 2.2rem 1rem; color: var(--muted); text-align: center; }
 .lobby-actions { display: flex; gap: 0.7rem; justify-content: center; }
 .join-note { max-width: 26rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
+.home-legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 0.55rem;
+  margin: 2rem auto 0;
+  color: #777773;
+  font-size: 0.72rem;
+}
+.home-legal-links a { color: inherit; text-underline-offset: 0.2em; }
+.home-legal-links a:hover { color: #f7f6f2; }
 
 @media (max-width: 520px) {
   .brand-header { margin-bottom: 2.25rem; }
